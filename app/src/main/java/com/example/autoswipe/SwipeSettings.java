@@ -1,0 +1,25 @@
+package com.example.autoswipe;
+
+final class SwipeSettings {
+    static final String PREFS = "auto_swipe_settings";
+    static final String ACTION_START = "com.example.autoswipe.START";
+    static final String ACTION_STOP = "com.example.autoswipe.STOP";
+    static final String KEY_RUNNING = "running";
+    static final String KEY_UNLOCKED = "unlocked";
+    static final String KEY_DIRECTION = "direction";
+    static final String KEY_INTERVAL_MS = "interval_ms";
+    static final String KEY_DURATION_MS = "duration_ms";
+    static final String KEY_DISTANCE_PERCENT = "distance_percent";
+
+    static final String DIRECTION_UP = "up";
+    static final String DIRECTION_DOWN = "down";
+    static final String DIRECTION_LEFT = "left";
+    static final String DIRECTION_RIGHT = "right";
+
+    static final int DEFAULT_INTERVAL_MS = 3000;
+    static final int DEFAULT_DURATION_MS = 450;
+    static final int DEFAULT_DISTANCE_PERCENT = 55;
+
+    private SwipeSettings() {
+    }
+}
