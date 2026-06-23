@@ -25,7 +25,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
 public class MainActivity extends android.app.Activity {
-    private static final String PASSCODE_HASH = "d7b518f93f481f76c3c10f6b008a3bbbd9f98dbe9e40e1a520d816608901bed2";
+    private static final String PASSCODE_HASH = "fb4a364525afe39bad19445304e509c0d3b7f82d2f22aa85e8f22979b291e6a0";
 
     private SharedPreferences prefs;
     private TextView statusView;
