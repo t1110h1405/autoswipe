@@ -21,6 +21,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -31,18 +32,21 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     private SharedPreferences prefs;
     private WindowManager windowManager;
     private View overlayView;
+    private View targetPickerView;
     private TextView overlayStatusView;
     private Button overlayToggleButton;
+    private Button overlayModeButton;
+    private Button overlayTargetButton;
     private boolean receiverRegistered;
 
-    private final Runnable swipeLoop = new Runnable() {
+    private final Runnable actionLoop = new Runnable() {
         @Override
         public void run() {
             if (!prefs.getBoolean(SwipeSettings.KEY_RUNNING, false)) {
                 return;
             }
 
-            performSwipe();
+            performSelectedAction();
             int intervalMs = prefs.getInt(SwipeSettings.KEY_INTERVAL_MS, SwipeSettings.DEFAULT_INTERVAL_MS);
             handler.postDelayed(this, Math.max(intervalMs, 500));
         }
@@ -82,14 +86,16 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
-        stopSwiping();
+        stopActions();
         removeOverlay();
+        removeTargetPicker();
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
-        stopSwiping();
+        stopActions();
         removeOverlay();
+        removeTargetPicker();
         if (receiverRegistered) {
             unregisterReceiver(controlReceiver);
             receiverRegistered = false;
@@ -115,13 +121,17 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         if (!prefs.getBoolean(SwipeSettings.KEY_UNLOCKED, false)) {
             return;
         }
-        handler.removeCallbacks(swipeLoop);
-        handler.postDelayed(swipeLoop, START_DELAY_MS);
+        handler.removeCallbacks(actionLoop);
+        handler.postDelayed(actionLoop, START_DELAY_MS);
         updateOverlayState();
     }
 
     private void stopSwiping() {
-        handler.removeCallbacks(swipeLoop);
+        stopActions();
+    }
+
+    private void stopActions() {
+        handler.removeCallbacks(actionLoop);
         updateOverlayState();
     }
 
@@ -172,9 +182,22 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayStatusView.setTextSize(12);
         root.addView(overlayStatusView);
 
+        overlayModeButton = new Button(this);
+        overlayModeButton.setAllCaps(false);
+        overlayModeButton.setMinWidth(dp(112));
+        overlayModeButton.setOnClickListener(v -> toggleMode());
+        root.addView(overlayModeButton);
+
+        overlayTargetButton = new Button(this);
+        overlayTargetButton.setText("位置選択");
+        overlayTargetButton.setAllCaps(false);
+        overlayTargetButton.setMinWidth(dp(112));
+        overlayTargetButton.setOnClickListener(v -> showTargetPicker());
+        root.addView(overlayTargetButton);
+
         overlayToggleButton = new Button(this);
         overlayToggleButton.setAllCaps(false);
-        overlayToggleButton.setMinWidth(dp(92));
+        overlayToggleButton.setMinWidth(dp(112));
         overlayToggleButton.setOnClickListener(v -> toggleFromOverlay());
         root.addView(overlayToggleButton);
 
@@ -228,19 +251,100 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         boolean running = prefs.getBoolean(SwipeSettings.KEY_RUNNING, false);
         prefs.edit().putBoolean(SwipeSettings.KEY_RUNNING, !running).apply();
         if (running) {
-            stopSwiping();
+            stopActions();
         } else {
             startSwiping();
         }
     }
 
     private void updateOverlayState() {
-        if (overlayStatusView == null || overlayToggleButton == null) {
+        if (overlayStatusView == null || overlayToggleButton == null || overlayModeButton == null) {
             return;
         }
         boolean running = prefs.getBoolean(SwipeSettings.KEY_RUNNING, false);
-        overlayStatusView.setText(running ? "実行中" : "停止中");
+        String mode = prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE);
+        int xPercent = prefs.getInt(SwipeSettings.KEY_TARGET_X_PERCENT, SwipeSettings.DEFAULT_TARGET_X_PERCENT);
+        int yPercent = prefs.getInt(SwipeSettings.KEY_TARGET_Y_PERCENT, SwipeSettings.DEFAULT_TARGET_Y_PERCENT);
+        overlayStatusView.setText((running ? "実行中" : "停止中") + " / 位置 " + xPercent + "%, " + yPercent + "%");
+        overlayModeButton.setText(SwipeSettings.MODE_TAP.equals(mode) ? "モード: タップ" : "モード: スワイプ");
         overlayToggleButton.setText(running ? "停止" : "開始");
+    }
+
+    private void toggleMode() {
+        String mode = prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE);
+        String nextMode = SwipeSettings.MODE_TAP.equals(mode) ? SwipeSettings.MODE_SWIPE : SwipeSettings.MODE_TAP;
+        prefs.edit().putString(SwipeSettings.KEY_MODE, nextMode).apply();
+        updateOverlayState();
+    }
+
+    private void showTargetPicker() {
+        if (windowManager == null || targetPickerView != null) {
+            return;
+        }
+        boolean wasRunning = prefs.getBoolean(SwipeSettings.KEY_RUNNING, false);
+        if (wasRunning) {
+            prefs.edit().putBoolean(SwipeSettings.KEY_RUNNING, false).apply();
+            stopActions();
+        }
+
+        FrameLayout picker = new FrameLayout(this);
+        picker.setBackgroundColor(Color.argb(95, 0, 0, 0));
+        TextView guide = new TextView(this);
+        guide.setText("実行したい位置をタップ");
+        guide.setTextColor(Color.WHITE);
+        guide.setTextSize(18);
+        guide.setGravity(Gravity.CENTER);
+        guide.setBackgroundColor(Color.argb(180, 17, 24, 39));
+        FrameLayout.LayoutParams guideParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(72),
+                Gravity.TOP
+        );
+        picker.addView(guide, guideParams);
+        picker.setOnTouchListener((view, event) -> {
+            if (event.getAction() != MotionEvent.ACTION_UP) {
+                return true;
+            }
+            saveTargetPosition(event.getRawX(), event.getRawY());
+            removeTargetPicker();
+            if (wasRunning) {
+                prefs.edit().putBoolean(SwipeSettings.KEY_RUNNING, true).apply();
+                startSwiping();
+            }
+            return true;
+        });
+
+        targetPickerView = picker;
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+        );
+        params.gravity = Gravity.TOP | Gravity.START;
+        windowManager.addView(targetPickerView, params);
+    }
+
+    private void saveTargetPosition(float rawX, float rawY) {
+        DisplayMetrics metrics = getDisplayMetrics();
+        if (metrics.widthPixels <= 0 || metrics.heightPixels <= 0) {
+            return;
+        }
+        int xPercent = clamp(Math.round(rawX * 100f / metrics.widthPixels), 1, 99);
+        int yPercent = clamp(Math.round(rawY * 100f / metrics.heightPixels), 1, 99);
+        prefs.edit()
+                .putInt(SwipeSettings.KEY_TARGET_X_PERCENT, xPercent)
+                .putInt(SwipeSettings.KEY_TARGET_Y_PERCENT, yPercent)
+                .apply();
+        updateOverlayState();
+    }
+
+    private void removeTargetPicker() {
+        if (windowManager != null && targetPickerView != null) {
+            windowManager.removeView(targetPickerView);
+        }
+        targetPickerView = null;
     }
 
     private void removeOverlay() {
@@ -250,21 +354,39 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayView = null;
         overlayStatusView = null;
         overlayToggleButton = null;
+        overlayModeButton = null;
+        overlayTargetButton = null;
+    }
+
+    private void performSelectedAction() {
+        String mode = prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE);
+        if (SwipeSettings.MODE_TAP.equals(mode)) {
+            performTap();
+        } else {
+            performSwipe();
+        }
+    }
+
+    private void performTap() {
+        DisplayMetrics metrics = getDisplayMetrics();
+        float x = getTargetX(metrics);
+        float y = getTargetY(metrics);
+
+        Path path = new Path();
+        path.moveTo(x, y);
+
+        GestureDescription gesture = new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, 80))
+                .build();
+        dispatchGesture(gesture, null, null);
     }
 
     private void performSwipe() {
-        DisplayMetrics metrics = new DisplayMetrics();
-        WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        if (windowManager == null) {
-            return;
-        }
-
-        windowManager.getDefaultDisplay().getRealMetrics(metrics);
-
+        DisplayMetrics metrics = getDisplayMetrics();
         int width = metrics.widthPixels;
         int height = metrics.heightPixels;
-        float centerX = width * 0.5f;
-        float centerY = height * 0.5f;
+        float centerX = getTargetX(metrics);
+        float centerY = getTargetY(metrics);
         float distance = Math.min(width, height)
                 * prefs.getInt(SwipeSettings.KEY_DISTANCE_PERCENT, SwipeSettings.DEFAULT_DISTANCE_PERCENT)
                 / 100f;
@@ -289,6 +411,11 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
             endX = centerX + distance / 2f;
         }
 
+        startX = clamp(startX, 1f, width - 1f);
+        startY = clamp(startY, 1f, height - 1f);
+        endX = clamp(endX, 1f, width - 1f);
+        endY = clamp(endY, 1f, height - 1f);
+
         Path path = new Path();
         path.moveTo(startX, startY);
         path.lineTo(endX, endY);
@@ -302,5 +429,36 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private DisplayMetrics getDisplayMetrics() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        WindowManager currentWindowManager = windowManager != null
+                ? windowManager
+                : (WindowManager) getSystemService(WINDOW_SERVICE);
+        if (currentWindowManager != null) {
+            currentWindowManager.getDefaultDisplay().getRealMetrics(metrics);
+        }
+        return metrics;
+    }
+
+    private float getTargetX(DisplayMetrics metrics) {
+        return metrics.widthPixels
+                * prefs.getInt(SwipeSettings.KEY_TARGET_X_PERCENT, SwipeSettings.DEFAULT_TARGET_X_PERCENT)
+                / 100f;
+    }
+
+    private float getTargetY(DisplayMetrics metrics) {
+        return metrics.heightPixels
+                * prefs.getInt(SwipeSettings.KEY_TARGET_Y_PERCENT, SwipeSettings.DEFAULT_TARGET_Y_PERCENT)
+                / 100f;
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
+    }
+
+    private float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(value, max));
     }
 }
