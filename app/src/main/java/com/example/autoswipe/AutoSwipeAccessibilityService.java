@@ -7,7 +7,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
@@ -304,10 +306,18 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
             stopActions();
         }
 
-        FrameLayout picker = new FrameLayout(this);
+        TargetPickerLayout picker = new TargetPickerLayout(this);
         picker.setBackgroundColor(Color.argb(95, 0, 0, 0));
+        DisplayMetrics metrics = getDisplayMetrics();
+        picker.setPreview(
+                getTargetX(metrics),
+                getTargetY(metrics),
+                prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE),
+                prefs.getString(SwipeSettings.KEY_DIRECTION, SwipeSettings.DIRECTION_UP)
+        );
+        String mode = prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE);
         TextView guide = new TextView(this);
-        guide.setText("実行したい位置をタップ");
+        guide.setText(SwipeSettings.MODE_TAP.equals(mode) ? "タップしたい位置を選択" : "スワイプの中心位置を選択");
         guide.setTextColor(Color.WHITE);
         guide.setTextSize(18);
         guide.setGravity(Gravity.CENTER);
@@ -319,9 +329,24 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         );
         picker.addView(guide, guideParams);
         picker.setOnTouchListener((view, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+                picker.setPreview(
+                        event.getRawX(),
+                        event.getRawY(),
+                        prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE),
+                        prefs.getString(SwipeSettings.KEY_DIRECTION, SwipeSettings.DIRECTION_UP)
+                );
+                return true;
+            }
             if (event.getAction() != MotionEvent.ACTION_UP) {
                 return true;
             }
+            picker.setPreview(
+                    event.getRawX(),
+                    event.getRawY(),
+                    prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE),
+                    prefs.getString(SwipeSettings.KEY_DIRECTION, SwipeSettings.DIRECTION_UP)
+            );
             saveTargetPosition(event.getRawX(), event.getRawY());
             removeTargetPicker();
             if (wasRunning) {
@@ -477,5 +502,118 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
 
     private float clamp(float value, float min, float max) {
         return Math.max(min, Math.min(value, max));
+    }
+
+    private class TargetPickerLayout extends FrameLayout {
+        private final Paint pointerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path arrowHead = new Path();
+        private float previewX;
+        private float previewY;
+        private String previewMode = SwipeSettings.MODE_SWIPE;
+        private String previewDirection = SwipeSettings.DIRECTION_UP;
+
+        TargetPickerLayout(Context context) {
+            super(context);
+            setWillNotDraw(false);
+            pointerPaint.setStrokeCap(Paint.Cap.ROUND);
+            pointerPaint.setStrokeJoin(Paint.Join.ROUND);
+            textPaint.setColor(Color.WHITE);
+            textPaint.setTextSize(dp(16));
+            textPaint.setShadowLayer(dp(3), 0, dp(1), Color.BLACK);
+        }
+
+        void setPreview(float x, float y, String mode, String direction) {
+            previewX = x;
+            previewY = y;
+            previewMode = mode;
+            previewDirection = direction;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (previewX <= 0f || previewY <= 0f) {
+                return;
+            }
+            if (SwipeSettings.MODE_TAP.equals(previewMode)) {
+                drawTapPointer(canvas);
+            } else {
+                drawSwipePointer(canvas);
+            }
+        }
+
+        private void drawTapPointer(Canvas canvas) {
+            pointerPaint.setStyle(Paint.Style.STROKE);
+            pointerPaint.setStrokeWidth(dp(4));
+            pointerPaint.setColor(Color.WHITE);
+            canvas.drawCircle(previewX, previewY, dp(28), pointerPaint);
+            pointerPaint.setColor(Color.rgb(220, 38, 38));
+            canvas.drawCircle(previewX, previewY, dp(18), pointerPaint);
+            canvas.drawLine(previewX - dp(42), previewY, previewX + dp(42), previewY, pointerPaint);
+            canvas.drawLine(previewX, previewY - dp(42), previewX, previewY + dp(42), pointerPaint);
+            drawLabel(canvas, "タップ位置", previewX + dp(34), previewY - dp(26));
+        }
+
+        private void drawSwipePointer(Canvas canvas) {
+            float length = dp(150);
+            float dx = 0f;
+            float dy = -length;
+            if (SwipeSettings.DIRECTION_DOWN.equals(previewDirection)) {
+                dy = length;
+            } else if (SwipeSettings.DIRECTION_LEFT.equals(previewDirection)) {
+                dx = -length;
+                dy = 0f;
+            } else if (SwipeSettings.DIRECTION_RIGHT.equals(previewDirection)) {
+                dx = length;
+                dy = 0f;
+            }
+
+            float startX = previewX - dx / 2f;
+            float startY = previewY - dy / 2f;
+            float endX = previewX + dx / 2f;
+            float endY = previewY + dy / 2f;
+
+            pointerPaint.setStyle(Paint.Style.STROKE);
+            pointerPaint.setStrokeWidth(dp(8));
+            pointerPaint.setColor(Color.WHITE);
+            canvas.drawLine(startX, startY, endX, endY, pointerPaint);
+            pointerPaint.setStrokeWidth(dp(5));
+            pointerPaint.setColor(Color.rgb(220, 38, 38));
+            canvas.drawLine(startX, startY, endX, endY, pointerPaint);
+
+            drawArrowHead(canvas, endX, endY, dx, dy);
+            pointerPaint.setStyle(Paint.Style.STROKE);
+            pointerPaint.setStrokeWidth(dp(4));
+            canvas.drawCircle(previewX, previewY, dp(20), pointerPaint);
+            drawLabel(canvas, "スワイプ方向", previewX + dp(28), previewY - dp(30));
+        }
+
+        private void drawArrowHead(Canvas canvas, float endX, float endY, float dx, float dy) {
+            float angle = (float) Math.atan2(dy, dx);
+            float size = dp(24);
+            float wing = 2.55f;
+            arrowHead.reset();
+            arrowHead.moveTo(endX, endY);
+            arrowHead.lineTo(
+                    endX - size * (float) Math.cos(angle - wing),
+                    endY - size * (float) Math.sin(angle - wing)
+            );
+            arrowHead.lineTo(
+                    endX - size * (float) Math.cos(angle + wing),
+                    endY - size * (float) Math.sin(angle + wing)
+            );
+            arrowHead.close();
+            pointerPaint.setStyle(Paint.Style.FILL);
+            pointerPaint.setColor(Color.rgb(220, 38, 38));
+            canvas.drawPath(arrowHead, pointerPaint);
+        }
+
+        private void drawLabel(Canvas canvas, String text, float x, float y) {
+            float safeX = clamp(x, dp(12), Math.max(dp(12), getWidth() - dp(130)));
+            float safeY = clamp(y, dp(100), Math.max(dp(100), getHeight() - dp(20)));
+            canvas.drawText(text, safeX, safeY, textPaint);
+        }
     }
 }
