@@ -164,7 +164,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     private View buildOverlayView() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(10), dp(8), dp(10), dp(10));
+        root.setPadding(dp(6), dp(6), dp(6), dp(6));
 
         GradientDrawable background = new GradientDrawable();
         background.setColor(Color.argb(230, 17, 24, 39));
@@ -172,36 +172,53 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         root.setBackground(background);
 
         TextView title = new TextView(this);
-        title.setText("Auto Swipe");
+        title.setText("Auto");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(12);
+        title.setTextSize(11);
+        title.setGravity(Gravity.CENTER);
         root.addView(title);
 
         overlayStatusView = new TextView(this);
         overlayStatusView.setTextColor(Color.WHITE);
-        overlayStatusView.setTextSize(12);
+        overlayStatusView.setTextSize(10);
+        overlayStatusView.setGravity(Gravity.CENTER);
         root.addView(overlayStatusView);
 
         overlayModeButton = new Button(this);
         overlayModeButton.setAllCaps(false);
-        overlayModeButton.setMinWidth(dp(112));
+        overlayModeButton.setMinWidth(0);
+        overlayModeButton.setMinimumWidth(0);
+        overlayModeButton.setTextSize(11);
+        overlayModeButton.setPadding(0, 0, 0, 0);
         overlayModeButton.setOnClickListener(v -> toggleMode());
-        root.addView(overlayModeButton);
+        root.addView(overlayModeButton, compactButtonParams());
 
         overlayTargetButton = new Button(this);
-        overlayTargetButton.setText("位置選択");
+        overlayTargetButton.setText("位置");
         overlayTargetButton.setAllCaps(false);
-        overlayTargetButton.setMinWidth(dp(112));
+        overlayTargetButton.setMinWidth(0);
+        overlayTargetButton.setMinimumWidth(0);
+        overlayTargetButton.setTextSize(11);
+        overlayTargetButton.setPadding(0, 0, 0, 0);
         overlayTargetButton.setOnClickListener(v -> showTargetPicker());
-        root.addView(overlayTargetButton);
+        root.addView(overlayTargetButton, compactButtonParams());
 
         overlayToggleButton = new Button(this);
         overlayToggleButton.setAllCaps(false);
-        overlayToggleButton.setMinWidth(dp(112));
+        overlayToggleButton.setMinWidth(0);
+        overlayToggleButton.setMinimumWidth(0);
+        overlayToggleButton.setTextSize(11);
+        overlayToggleButton.setPadding(0, 0, 0, 0);
         overlayToggleButton.setOnClickListener(v -> toggleFromOverlay());
-        root.addView(overlayToggleButton);
+        root.addView(overlayToggleButton, compactButtonParams());
 
         return root;
+    }
+
+    private LinearLayout.LayoutParams compactButtonParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(72), dp(42));
+        params.setMargins(0, dp(3), 0, 0);
+        return params;
     }
 
     private void attachDragHandler(View view, WindowManager.LayoutParams params) {
@@ -265,8 +282,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         String mode = prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE);
         int xPercent = prefs.getInt(SwipeSettings.KEY_TARGET_X_PERCENT, SwipeSettings.DEFAULT_TARGET_X_PERCENT);
         int yPercent = prefs.getInt(SwipeSettings.KEY_TARGET_Y_PERCENT, SwipeSettings.DEFAULT_TARGET_Y_PERCENT);
-        overlayStatusView.setText((running ? "実行中" : "停止中") + " / 位置 " + xPercent + "%, " + yPercent + "%");
-        overlayModeButton.setText(SwipeSettings.MODE_TAP.equals(mode) ? "モード: タップ" : "モード: スワイプ");
+        overlayStatusView.setText((running ? "ON" : "OFF") + "\n" + xPercent + "," + yPercent);
+        overlayModeButton.setText(SwipeSettings.MODE_TAP.equals(mode) ? "タップ" : "スワイプ");
         overlayToggleButton.setText(running ? "停止" : "開始");
     }
 
