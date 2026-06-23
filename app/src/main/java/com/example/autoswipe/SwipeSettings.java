@@ -4,6 +4,7 @@ final class SwipeSettings {
     static final String PREFS = "auto_swipe_settings";
     static final String ACTION_START = "com.example.autoswipe.START";
     static final String ACTION_STOP = "com.example.autoswipe.STOP";
+    static final String ACTION_REFRESH_OVERLAY = "com.example.autoswipe.REFRESH_OVERLAY";
     static final String KEY_RUNNING = "running";
     static final String KEY_UNLOCKED = "unlocked";
     static final String KEY_DIRECTION = "direction";

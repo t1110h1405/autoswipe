@@ -115,6 +115,7 @@ public class MainActivity extends android.app.Activity {
         setContentView(buildContentView());
         bindSettings();
         refreshStatus();
+        sendBroadcast(new Intent(SwipeSettings.ACTION_REFRESH_OVERLAY).setPackage(getPackageName()));
     }
 
     private View buildContentView() {
