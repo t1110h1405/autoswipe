@@ -348,13 +348,15 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         int minutes = prefs.getInt(SwipeSettings.KEY_TIMER_MINUTES, SwipeSettings.DEFAULT_TIMER_MINUTES);
         int nextMinutes;
         if (minutes == 0) {
-            nextMinutes = 1;
-        } else if (minutes == 1) {
-            nextMinutes = 5;
-        } else if (minutes == 5) {
             nextMinutes = 10;
         } else if (minutes == 10) {
             nextMinutes = 30;
+        } else if (minutes == 30) {
+            nextMinutes = 60;
+        } else if (minutes == 60) {
+            nextMinutes = 180;
+        } else if (minutes == 180) {
+            nextMinutes = 300;
         } else {
             nextMinutes = 0;
         }
@@ -384,7 +386,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
 
     private String timerButtonText() {
         int minutes = prefs.getInt(SwipeSettings.KEY_TIMER_MINUTES, SwipeSettings.DEFAULT_TIMER_MINUTES);
-        return minutes <= 0 ? "T OFF" : "T " + minutes + "分";
+        return minutes <= 0 ? "T OFF" : "T " + timerLabel(minutes);
     }
 
     private String remainingTimerText() {
@@ -393,10 +395,17 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
             return "T OFF";
         }
         if (timerEndTimeMs <= 0L || !prefs.getBoolean(SwipeSettings.KEY_RUNNING, false)) {
-            return "T " + minutes + "分";
+            return "T " + timerLabel(minutes);
         }
         long remainingSeconds = Math.max(0L, (timerEndTimeMs - System.currentTimeMillis() + 999L) / 1000L);
         return "残 " + (remainingSeconds / 60L) + ":" + String.format("%02d", remainingSeconds % 60L);
+    }
+
+    private String timerLabel(int minutes) {
+        if (minutes >= 60 && minutes % 60 == 0) {
+            return (minutes / 60) + "h";
+        }
+        return minutes + "分";
     }
 
     private void showTargetPicker() {
