@@ -39,7 +39,31 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     private Button overlayToggleButton;
     private Button overlayModeButton;
     private Button overlayTargetButton;
+    private Button overlayTimerButton;
+    private Button overlayLockButton;
     private boolean receiverRegistered;
+    private long timerEndTimeMs;
+
+    private final Runnable timerTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!prefs.getBoolean(SwipeSettings.KEY_RUNNING, false)) {
+                timerEndTimeMs = 0L;
+                updateOverlayState();
+                return;
+            }
+            if (timerEndTimeMs > 0L && System.currentTimeMillis() >= timerEndTimeMs) {
+                prefs.edit().putBoolean(SwipeSettings.KEY_RUNNING, false).apply();
+                stopActions();
+                if (prefs.getBoolean(SwipeSettings.KEY_LOCK_ON_TIMER, false)) {
+                    performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
+                }
+                return;
+            }
+            updateOverlayState();
+            handler.postDelayed(this, 1000L);
+        }
+    };
 
     private final Runnable actionLoop = new Runnable() {
         @Override
@@ -125,6 +149,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         }
         handler.removeCallbacks(actionLoop);
         handler.postDelayed(actionLoop, START_DELAY_MS);
+        startTimerIfNeeded();
         updateOverlayState();
     }
 
@@ -134,6 +159,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
 
     private void stopActions() {
         handler.removeCallbacks(actionLoop);
+        handler.removeCallbacks(timerTick);
+        timerEndTimeMs = 0L;
         updateOverlayState();
     }
 
@@ -204,6 +231,24 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayTargetButton.setPadding(0, 0, 0, 0);
         overlayTargetButton.setOnClickListener(v -> showTargetPicker());
         root.addView(overlayTargetButton, compactButtonParams());
+
+        overlayTimerButton = new Button(this);
+        overlayTimerButton.setAllCaps(false);
+        overlayTimerButton.setMinWidth(0);
+        overlayTimerButton.setMinimumWidth(0);
+        overlayTimerButton.setTextSize(11);
+        overlayTimerButton.setPadding(0, 0, 0, 0);
+        overlayTimerButton.setOnClickListener(v -> cycleTimer());
+        root.addView(overlayTimerButton, compactButtonParams());
+
+        overlayLockButton = new Button(this);
+        overlayLockButton.setAllCaps(false);
+        overlayLockButton.setMinWidth(0);
+        overlayLockButton.setMinimumWidth(0);
+        overlayLockButton.setTextSize(11);
+        overlayLockButton.setPadding(0, 0, 0, 0);
+        overlayLockButton.setOnClickListener(v -> toggleLockOnTimer());
+        root.addView(overlayLockButton, compactButtonParams());
 
         overlayToggleButton = new Button(this);
         overlayToggleButton.setAllCaps(false);
@@ -277,15 +322,18 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     }
 
     private void updateOverlayState() {
-        if (overlayStatusView == null || overlayToggleButton == null || overlayModeButton == null) {
+        if (overlayStatusView == null || overlayToggleButton == null || overlayModeButton == null
+                || overlayTimerButton == null || overlayLockButton == null) {
             return;
         }
         boolean running = prefs.getBoolean(SwipeSettings.KEY_RUNNING, false);
         String mode = prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE);
         int xPercent = prefs.getInt(SwipeSettings.KEY_TARGET_X_PERCENT, SwipeSettings.DEFAULT_TARGET_X_PERCENT);
         int yPercent = prefs.getInt(SwipeSettings.KEY_TARGET_Y_PERCENT, SwipeSettings.DEFAULT_TARGET_Y_PERCENT);
-        overlayStatusView.setText((running ? "ON" : "OFF") + "\n" + xPercent + "," + yPercent);
+        overlayStatusView.setText((running ? "ON" : "OFF") + "\n" + xPercent + "," + yPercent + "\n" + remainingTimerText());
         overlayModeButton.setText(SwipeSettings.MODE_TAP.equals(mode) ? "タップ" : "スワイプ");
+        overlayTimerButton.setText(timerButtonText());
+        overlayLockButton.setText(prefs.getBoolean(SwipeSettings.KEY_LOCK_ON_TIMER, false) ? "L ON" : "L OFF");
         overlayToggleButton.setText(running ? "停止" : "開始");
     }
 
@@ -294,6 +342,61 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         String nextMode = SwipeSettings.MODE_TAP.equals(mode) ? SwipeSettings.MODE_SWIPE : SwipeSettings.MODE_TAP;
         prefs.edit().putString(SwipeSettings.KEY_MODE, nextMode).apply();
         updateOverlayState();
+    }
+
+    private void cycleTimer() {
+        int minutes = prefs.getInt(SwipeSettings.KEY_TIMER_MINUTES, SwipeSettings.DEFAULT_TIMER_MINUTES);
+        int nextMinutes;
+        if (minutes == 0) {
+            nextMinutes = 1;
+        } else if (minutes == 1) {
+            nextMinutes = 5;
+        } else if (minutes == 5) {
+            nextMinutes = 10;
+        } else if (minutes == 10) {
+            nextMinutes = 30;
+        } else {
+            nextMinutes = 0;
+        }
+        prefs.edit().putInt(SwipeSettings.KEY_TIMER_MINUTES, nextMinutes).apply();
+        if (prefs.getBoolean(SwipeSettings.KEY_RUNNING, false)) {
+            startTimerIfNeeded();
+        }
+        updateOverlayState();
+    }
+
+    private void toggleLockOnTimer() {
+        boolean enabled = prefs.getBoolean(SwipeSettings.KEY_LOCK_ON_TIMER, false);
+        prefs.edit().putBoolean(SwipeSettings.KEY_LOCK_ON_TIMER, !enabled).apply();
+        updateOverlayState();
+    }
+
+    private void startTimerIfNeeded() {
+        handler.removeCallbacks(timerTick);
+        int minutes = prefs.getInt(SwipeSettings.KEY_TIMER_MINUTES, SwipeSettings.DEFAULT_TIMER_MINUTES);
+        if (minutes <= 0) {
+            timerEndTimeMs = 0L;
+            return;
+        }
+        timerEndTimeMs = System.currentTimeMillis() + minutes * 60_000L;
+        handler.post(timerTick);
+    }
+
+    private String timerButtonText() {
+        int minutes = prefs.getInt(SwipeSettings.KEY_TIMER_MINUTES, SwipeSettings.DEFAULT_TIMER_MINUTES);
+        return minutes <= 0 ? "T OFF" : "T " + minutes + "分";
+    }
+
+    private String remainingTimerText() {
+        int minutes = prefs.getInt(SwipeSettings.KEY_TIMER_MINUTES, SwipeSettings.DEFAULT_TIMER_MINUTES);
+        if (minutes <= 0) {
+            return "T OFF";
+        }
+        if (timerEndTimeMs <= 0L || !prefs.getBoolean(SwipeSettings.KEY_RUNNING, false)) {
+            return "T " + minutes + "分";
+        }
+        long remainingSeconds = Math.max(0L, (timerEndTimeMs - System.currentTimeMillis() + 999L) / 1000L);
+        return "残 " + (remainingSeconds / 60L) + ":" + String.format("%02d", remainingSeconds % 60L);
     }
 
     private void showTargetPicker() {
@@ -398,6 +501,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayToggleButton = null;
         overlayModeButton = null;
         overlayTargetButton = null;
+        overlayTimerButton = null;
+        overlayLockButton = null;
     }
 
     private void performSelectedAction() {

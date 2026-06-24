@@ -29,26 +29,35 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.AUTOSWIPE_KEYSTORE_BASE64 }}" | base64 --decode > release-key.jks
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
 
-      - name: Build debug APK
-        run: gradle assembleDebug
+      - name: Build release APK
+        env:
+          AUTOSWIPE_KEYSTORE: ${{ github.workspace }}/release-key.jks
+          AUTOSWIPE_KEYSTORE_PASSWORD: ${{ secrets.AUTOSWIPE_KEYSTORE_PASSWORD }}
+          AUTOSWIPE_KEY_ALIAS: ${{ secrets.AUTOSWIPE_KEY_ALIAS }}
+          AUTOSWIPE_KEY_PASSWORD: ${{ secrets.AUTOSWIPE_KEY_PASSWORD }}
+        run: gradle assembleRelease
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk autoswipe-debug.apk
+        run: cp app/build/outputs/apk/release/app-release.apk autoswipe-release.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: autoswipe-debug-apk
-          path: autoswipe-debug.apk
+          name: autoswipe-release-apk
+          path: autoswipe-release.apk
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: autoswipe-debug.apk
+          files: autoswipe-release.apk
           generate_release_notes: true

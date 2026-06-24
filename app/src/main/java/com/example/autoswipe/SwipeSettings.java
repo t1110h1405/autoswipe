@@ -14,6 +14,8 @@ final class SwipeSettings {
     static final String KEY_DISTANCE_PERCENT = "distance_percent";
     static final String KEY_TARGET_X_PERCENT = "target_x_percent";
     static final String KEY_TARGET_Y_PERCENT = "target_y_percent";
+    static final String KEY_TIMER_MINUTES = "timer_minutes";
+    static final String KEY_LOCK_ON_TIMER = "lock_on_timer";
 
     static final String MODE_SWIPE = "swipe";
     static final String MODE_TAP = "tap";
@@ -28,6 +30,7 @@ final class SwipeSettings {
     static final int DEFAULT_DISTANCE_PERCENT = 55;
     static final int DEFAULT_TARGET_X_PERCENT = 50;
     static final int DEFAULT_TARGET_Y_PERCENT = 50;
+    static final int DEFAULT_TIMER_MINUTES = 0;
 
     private SwipeSettings() {
     }
