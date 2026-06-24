@@ -33,6 +33,7 @@ public class MainActivity extends android.app.Activity {
     private Spinner directionSpinner;
     private Spinner intervalSpinner;
     private Spinner durationSpinner;
+    private Spinner distanceSpinner;
 
     private final String[] directionLabels = {"上へ", "下へ", "左へ", "右へ"};
     private final String[] directionValues = {
@@ -45,6 +46,8 @@ public class MainActivity extends android.app.Activity {
     private final int[] intervalValues = {1000, 2000, 3000, 5000, 10000};
     private final String[] durationLabels = {"短い", "標準", "ゆっくり"};
     private final int[] durationValues = {250, 450, 800};
+    private final String[] distanceLabels = {"短め", "標準", "長め", "最大"};
+    private final int[] distanceValues = {35, 55, 75, 90};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,6 +142,7 @@ public class MainActivity extends android.app.Activity {
         directionSpinner = addSpinner(root, "方向", directionLabels);
         intervalSpinner = addSpinner(root, "間隔", intervalLabels);
         durationSpinner = addSpinner(root, "スワイプ速度", durationLabels);
+        distanceSpinner = addSpinner(root, "スワイプ距離", distanceLabels);
 
         startStopButton = new Button(this);
         startStopButton.setAllCaps(false);
@@ -179,6 +183,7 @@ public class MainActivity extends android.app.Activity {
         setSpinnerSelection(directionSpinner, directionValues, prefs.getString(SwipeSettings.KEY_DIRECTION, SwipeSettings.DIRECTION_UP));
         setSpinnerSelection(intervalSpinner, intervalValues, prefs.getInt(SwipeSettings.KEY_INTERVAL_MS, SwipeSettings.DEFAULT_INTERVAL_MS));
         setSpinnerSelection(durationSpinner, durationValues, prefs.getInt(SwipeSettings.KEY_DURATION_MS, SwipeSettings.DEFAULT_DURATION_MS));
+        setSpinnerSelection(distanceSpinner, distanceValues, prefs.getInt(SwipeSettings.KEY_DISTANCE_PERCENT, SwipeSettings.DEFAULT_DISTANCE_PERCENT));
 
         directionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -206,6 +211,17 @@ public class MainActivity extends android.app.Activity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 prefs.edit().putInt(SwipeSettings.KEY_DURATION_MS, durationValues[position]).apply();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        distanceSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                prefs.edit().putInt(SwipeSettings.KEY_DISTANCE_PERCENT, distanceValues[position]).apply();
             }
 
             @Override
