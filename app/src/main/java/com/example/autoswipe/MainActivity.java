@@ -1,6 +1,7 @@
 package com.example.autoswipe;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -155,6 +156,12 @@ public class MainActivity extends android.app.Activity {
         settingsButton.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         root.addView(settingsButton, matchWrap());
 
+        Button autoLockSettingsButton = new Button(this);
+        autoLockSettingsButton.setText("画面消灯・自動ロック設定を開く");
+        autoLockSettingsButton.setAllCaps(false);
+        autoLockSettingsButton.setOnClickListener(v -> openAutoLockSettings());
+        root.addView(autoLockSettingsButton, matchWrap());
+
         TextView note = new TextView(this);
         note.setText("開始後、対象アプリに切り替えてください。停止するときはこのアプリに戻って停止します。");
         note.setTextSize(13);
@@ -162,6 +169,19 @@ public class MainActivity extends android.app.Activity {
         root.addView(note, matchWrap());
 
         return root;
+    }
+
+    private void openAutoLockSettings() {
+        Intent displaySettings = new Intent(Settings.ACTION_DISPLAY_SETTINGS);
+        if (displaySettings.resolveActivity(getPackageManager()) != null) {
+            try {
+                startActivity(displaySettings);
+                return;
+            } catch (ActivityNotFoundException ignored) {
+                // Fall back to the main settings screen on manufacturer-specific devices.
+            }
+        }
+        startActivity(new Intent(Settings.ACTION_SETTINGS));
     }
 
     private Spinner addSpinner(LinearLayout root, String labelText, String[] labels) {
