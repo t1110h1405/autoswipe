@@ -730,23 +730,40 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         }
 
         private void drawSwipePointer(Canvas canvas) {
-            float length = dp(150);
-            float dx = 0f;
-            float dy = -length;
-            if (SwipeSettings.DIRECTION_DOWN.equals(previewDirection)) {
-                dy = length;
+            int distancePercent = prefs.getInt(
+                    SwipeSettings.KEY_DISTANCE_PERCENT,
+                    SwipeSettings.DEFAULT_DISTANCE_PERCENT
+            );
+            boolean vertical = SwipeSettings.DIRECTION_UP.equals(previewDirection)
+                    || SwipeSettings.DIRECTION_DOWN.equals(previewDirection);
+            float distance = (vertical ? getHeight() : getWidth()) * distancePercent / 100f;
+            float startX = previewX;
+            float startY = previewY;
+            float endX = previewX;
+            float endY = previewY;
+
+            if (SwipeSettings.DIRECTION_UP.equals(previewDirection)) {
+                startY += distance / 2f;
+                endY -= distance / 2f;
+            } else if (SwipeSettings.DIRECTION_DOWN.equals(previewDirection)) {
+                startY -= distance / 2f;
+                endY += distance / 2f;
             } else if (SwipeSettings.DIRECTION_LEFT.equals(previewDirection)) {
-                dx = -length;
-                dy = 0f;
+                startX += distance / 2f;
+                endX -= distance / 2f;
             } else if (SwipeSettings.DIRECTION_RIGHT.equals(previewDirection)) {
-                dx = length;
-                dy = 0f;
+                startX -= distance / 2f;
+                endX += distance / 2f;
             }
 
-            float startX = previewX - dx / 2f;
-            float startY = previewY - dy / 2f;
-            float endX = previewX + dx / 2f;
-            float endY = previewY + dy / 2f;
+            float horizontalMargin = Math.min(dp(SAFE_EDGE_MARGIN_DP), (getWidth() - 2f) / 2f);
+            float verticalMargin = Math.min(dp(SAFE_EDGE_MARGIN_DP), (getHeight() - 2f) / 2f);
+            startX = clamp(startX, horizontalMargin, getWidth() - horizontalMargin);
+            startY = clamp(startY, verticalMargin, getHeight() - verticalMargin);
+            endX = clamp(endX, horizontalMargin, getWidth() - horizontalMargin);
+            endY = clamp(endY, verticalMargin, getHeight() - verticalMargin);
+            float dx = endX - startX;
+            float dy = endY - startY;
 
             pointerPaint.setStyle(Paint.Style.STROKE);
             pointerPaint.setStrokeWidth(dp(8));
@@ -760,7 +777,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
             pointerPaint.setStyle(Paint.Style.STROKE);
             pointerPaint.setStrokeWidth(dp(4));
             canvas.drawCircle(previewX, previewY, dp(20), pointerPaint);
-            drawLabel(canvas, "スワイプ方向", previewX + dp(28), previewY - dp(30));
+            canvas.drawCircle(startX, startY, dp(10), pointerPaint);
+            drawLabel(canvas, "距離 " + distancePercent + "%", previewX + dp(28), previewY - dp(30));
         }
 
         private void drawArrowHead(Canvas canvas, float endX, float endY, float dx, float dy) {
