@@ -597,11 +597,14 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         }
         float centerX = getTargetX(metrics);
         float centerY = getTargetY(metrics);
-        float distance = Math.min(width, height)
+        String direction = prefs.getString(SwipeSettings.KEY_DIRECTION, SwipeSettings.DIRECTION_UP);
+        boolean vertical = SwipeSettings.DIRECTION_UP.equals(direction)
+                || SwipeSettings.DIRECTION_DOWN.equals(direction);
+        float axisLength = vertical ? height : width;
+        float distance = axisLength
                 * prefs.getInt(SwipeSettings.KEY_DISTANCE_PERCENT, SwipeSettings.DEFAULT_DISTANCE_PERCENT)
                 / 100f;
 
-        String direction = prefs.getString(SwipeSettings.KEY_DIRECTION, SwipeSettings.DIRECTION_UP);
         float startX = centerX;
         float startY = centerY;
         float endX = centerX;
