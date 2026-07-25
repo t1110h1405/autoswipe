@@ -1,6 +1,7 @@
 package com.example.autoswipe;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityService.GestureResultCallback;
 import android.accessibilityservice.GestureDescription;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -16,6 +17,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -29,6 +31,9 @@ import android.widget.TextView;
 
 public class AutoSwipeAccessibilityService extends AccessibilityService {
     private static final long START_DELAY_MS = 3000L;
+    private static final long RETRY_DELAY_MS = 300L;
+    private static final long MIN_ACTION_GAP_MS = 100L;
+    private static final int SAFE_EDGE_MARGIN_DP = 24;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SharedPreferences prefs;
@@ -43,6 +48,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     private Button overlayLockButton;
     private boolean receiverRegistered;
     private long timerEndTimeMs;
+    private int actionGeneration;
+    private boolean gestureInFlight;
 
     private final Runnable timerTick = new Runnable() {
         @Override
@@ -68,13 +75,29 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     private final Runnable actionLoop = new Runnable() {
         @Override
         public void run() {
-            if (!prefs.getBoolean(SwipeSettings.KEY_RUNNING, false)) {
+            if (!prefs.getBoolean(SwipeSettings.KEY_RUNNING, false) || gestureInFlight) {
                 return;
             }
 
-            performSelectedAction();
-            int intervalMs = prefs.getInt(SwipeSettings.KEY_INTERVAL_MS, SwipeSettings.DEFAULT_INTERVAL_MS);
-            handler.postDelayed(this, Math.max(intervalMs, 500));
+            int generation = actionGeneration;
+            long startedAtMs = SystemClock.uptimeMillis();
+            gestureInFlight = true;
+            GestureResultCallback callback = new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    finishGesture(generation, startedAtMs, false);
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    finishGesture(generation, startedAtMs, true);
+                }
+            };
+
+            if (!performSelectedAction(callback)) {
+                gestureInFlight = false;
+                scheduleNextAction(generation, RETRY_DELAY_MS);
+            }
         }
     };
 
@@ -112,8 +135,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
+        prefs.edit().putBoolean(SwipeSettings.KEY_RUNNING, false).apply();
         stopActions();
-        removeOverlay();
         removeTargetPicker();
     }
 
@@ -147,6 +170,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         if (!prefs.getBoolean(SwipeSettings.KEY_UNLOCKED, false)) {
             return;
         }
+        actionGeneration++;
+        gestureInFlight = false;
         handler.removeCallbacks(actionLoop);
         handler.postDelayed(actionLoop, START_DELAY_MS);
         startTimerIfNeeded();
@@ -158,10 +183,37 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     }
 
     private void stopActions() {
+        actionGeneration++;
+        gestureInFlight = false;
         handler.removeCallbacks(actionLoop);
         handler.removeCallbacks(timerTick);
         timerEndTimeMs = 0L;
         updateOverlayState();
+    }
+
+    private void finishGesture(int generation, long startedAtMs, boolean cancelled) {
+        if (generation != actionGeneration) {
+            return;
+        }
+        gestureInFlight = false;
+        int intervalMs = Math.max(
+                prefs.getInt(SwipeSettings.KEY_INTERVAL_MS, SwipeSettings.DEFAULT_INTERVAL_MS),
+                500
+        );
+        long elapsedMs = SystemClock.uptimeMillis() - startedAtMs;
+        long delayMs = cancelled
+                ? Math.min(RETRY_DELAY_MS, intervalMs)
+                : Math.max(MIN_ACTION_GAP_MS, intervalMs - elapsedMs);
+        scheduleNextAction(generation, delayMs);
+    }
+
+    private void scheduleNextAction(int generation, long delayMs) {
+        if (generation != actionGeneration
+                || !prefs.getBoolean(SwipeSettings.KEY_RUNNING, false)) {
+            return;
+        }
+        handler.removeCallbacks(actionLoop);
+        handler.postDelayed(actionLoop, Math.max(delayMs, MIN_ACTION_GAP_MS));
     }
 
     private void showOverlayIfAllowed() {
@@ -514,16 +566,15 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayLockButton = null;
     }
 
-    private void performSelectedAction() {
+    private boolean performSelectedAction(GestureResultCallback callback) {
         String mode = prefs.getString(SwipeSettings.KEY_MODE, SwipeSettings.MODE_SWIPE);
         if (SwipeSettings.MODE_TAP.equals(mode)) {
-            performTap();
-        } else {
-            performSwipe();
+            return performTap(callback);
         }
+        return performSwipe(callback);
     }
 
-    private void performTap() {
+    private boolean performTap(GestureResultCallback callback) {
         DisplayMetrics metrics = getDisplayMetrics();
         float x = getTargetX(metrics);
         float y = getTargetY(metrics);
@@ -534,13 +585,16 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         GestureDescription gesture = new GestureDescription.Builder()
                 .addStroke(new GestureDescription.StrokeDescription(path, 0, 80))
                 .build();
-        dispatchGesture(gesture, null, null);
+        return dispatchGesture(gesture, callback, handler);
     }
 
-    private void performSwipe() {
+    private boolean performSwipe(GestureResultCallback callback) {
         DisplayMetrics metrics = getDisplayMetrics();
         int width = metrics.widthPixels;
         int height = metrics.heightPixels;
+        if (width <= 2 || height <= 2) {
+            return false;
+        }
         float centerX = getTargetX(metrics);
         float centerY = getTargetY(metrics);
         float distance = Math.min(width, height)
@@ -567,10 +621,12 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
             endX = centerX + distance / 2f;
         }
 
-        startX = clamp(startX, 1f, width - 1f);
-        startY = clamp(startY, 1f, height - 1f);
-        endX = clamp(endX, 1f, width - 1f);
-        endY = clamp(endY, 1f, height - 1f);
+        float horizontalMargin = Math.min(dp(SAFE_EDGE_MARGIN_DP), (width - 2f) / 2f);
+        float verticalMargin = Math.min(dp(SAFE_EDGE_MARGIN_DP), (height - 2f) / 2f);
+        startX = clamp(startX, horizontalMargin, width - horizontalMargin);
+        startY = clamp(startY, verticalMargin, height - verticalMargin);
+        endX = clamp(endX, horizontalMargin, width - horizontalMargin);
+        endY = clamp(endY, verticalMargin, height - verticalMargin);
 
         Path path = new Path();
         path.moveTo(startX, startY);
@@ -580,7 +636,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         GestureDescription gesture = new GestureDescription.Builder()
                 .addStroke(new GestureDescription.StrokeDescription(path, 0, Math.max(durationMs, 100)))
                 .build();
-        dispatchGesture(gesture, null, null);
+        return dispatchGesture(gesture, callback, handler);
     }
 
     private int dp(int value) {
