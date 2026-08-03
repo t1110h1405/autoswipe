@@ -19,8 +19,8 @@ Allow an authorized administrator to set one shared HTTP(S) URL from a web page.
 - [x] Authenticate the Firebase CLI and create or select the Firebase project.
 - [x] Configure the Android app, Realtime Database, Authentication, Hosting, and security rules.
 - [x] Implement and verify the administrator page.
-- [x] Implement Android URL synchronization and buttons.
-- [ ] Build the signed APK, deploy the admin page, and publish the release.
+- [x] Implement and verify Android URL synchronization and buttons.
+- [x] Build the signed APK, deploy the admin page, and publish the release.
 
 ## Verification
 
