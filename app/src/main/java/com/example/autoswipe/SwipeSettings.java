@@ -16,6 +16,8 @@ final class SwipeSettings {
     static final String KEY_TARGET_Y_PERCENT = "target_y_percent";
     static final String KEY_TIMER_MINUTES = "timer_minutes";
     static final String KEY_LOCK_ON_TIMER = "lock_on_timer";
+    static final String KEY_SHARED_URL = "shared_url";
+    static final String KEY_SHARED_URL_UPDATED_AT = "shared_url_updated_at";
 
     static final String MODE_SWIPE = "swipe";
     static final String MODE_TAP = "tap";

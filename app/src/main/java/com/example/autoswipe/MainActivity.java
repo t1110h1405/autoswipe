@@ -17,6 +17,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -35,6 +36,15 @@ public class MainActivity extends android.app.Activity {
     private Spinner intervalSpinner;
     private Spinner durationSpinner;
     private Spinner distanceSpinner;
+    private Button sharedUrlButton;
+    private boolean preferenceListenerRegistered;
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener preferenceChangeListener =
+            (sharedPreferences, key) -> {
+                if (SwipeSettings.KEY_SHARED_URL.equals(key)) {
+                    refreshSharedUrl();
+                }
+            };
 
     private final String[] directionLabels = {"上へ", "下へ", "左へ", "右へ"};
     private final String[] directionValues = {
@@ -67,6 +77,24 @@ public class MainActivity extends android.app.Activity {
         if (prefs.getBoolean(SwipeSettings.KEY_UNLOCKED, false) && statusView != null) {
             refreshStatus();
         }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (!preferenceListenerRegistered) {
+            prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener);
+            preferenceListenerRegistered = true;
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        if (preferenceListenerRegistered) {
+            prefs.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener);
+            preferenceListenerRegistered = false;
+        }
+        super.onStop();
     }
 
     private View buildUnlockView() {
@@ -112,7 +140,9 @@ public class MainActivity extends android.app.Activity {
         });
         root.addView(unlockButton, matchWrap());
 
-        return root;
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.addView(root);
+        return scrollView;
     }
 
     private void showMainScreen() {
@@ -139,6 +169,12 @@ public class MainActivity extends android.app.Activity {
         statusView.setTextSize(15);
         statusView.setPadding(0, dp(12), 0, dp(12));
         root.addView(statusView, matchWrap());
+
+        sharedUrlButton = new Button(this);
+        sharedUrlButton.setAllCaps(false);
+        sharedUrlButton.setOnClickListener(v -> openSharedUrl());
+        root.addView(sharedUrlButton, matchWrap());
+        refreshSharedUrl();
 
         directionSpinner = addSpinner(root, "方向", directionLabels);
         intervalSpinner = addSpinner(root, "間隔", intervalLabels);
@@ -168,7 +204,27 @@ public class MainActivity extends android.app.Activity {
         note.setPadding(0, dp(12), 0, 0);
         root.addView(note, matchWrap());
 
-        return root;
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.addView(root);
+        return scrollView;
+    }
+
+    private void refreshSharedUrl() {
+        if (sharedUrlButton == null || prefs == null) {
+            return;
+        }
+        String url = SharedUrlManager.getCachedUrl(prefs);
+        if (TextUtils.isEmpty(url)) {
+            sharedUrlButton.setVisibility(View.GONE);
+            return;
+        }
+        sharedUrlButton.setText("共有リンクを開く\n" + SharedUrlManager.displayLabel(url));
+        sharedUrlButton.setVisibility(View.VISIBLE);
+    }
+
+    private void openSharedUrl() {
+        String url = SharedUrlManager.getCachedUrl(prefs);
+        SharedUrlManager.open(this, url);
     }
 
     private void openAutoLockSettings() {

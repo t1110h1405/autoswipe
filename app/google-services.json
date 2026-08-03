@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "515744945939",
+    "firebase_url": "https://autoswipe-t1110h1405-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "autoswipe-t1110h1405",
+    "storage_bucket": "autoswipe-t1110h1405.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:515744945939:android:327e2782dda751fc36ece6",
+        "android_client_info": {
+          "package_name": "com.example.autoswipe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEEWlfhzvUH-DP2aPIo2YwyoSXfK5FDCg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

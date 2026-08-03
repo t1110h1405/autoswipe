@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "sharedUrl": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 't1110h1405@gmail.com' && auth.token.email_verified == true && newData.exists()",
+      ".validate": "newData.hasChildren(['url', 'updatedAt'])",
+      "url": {
+        ".validate": "newData.isString() && newData.val().length <= 2048 && (newData.val() == '' || newData.val().matches(/^https?:\\/\\/[^\\s]+$/))"
+      },
+      "updatedAt": {
+        ".validate": "newData.isNumber() && newData.val() <= now && newData.val() > now - 60000"
+      },
+      "$other": {
+        ".validate": false
+      }
+    }
+  }
+}

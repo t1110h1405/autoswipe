@@ -46,10 +46,19 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     private Button overlayTargetButton;
     private Button overlayTimerButton;
     private Button overlayLockButton;
+    private Button overlaySharedUrlButton;
     private boolean receiverRegistered;
+    private boolean preferenceListenerRegistered;
     private long timerEndTimeMs;
     private int actionGeneration;
     private boolean gestureInFlight;
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener preferenceChangeListener =
+            (sharedPreferences, key) -> {
+                if (SwipeSettings.KEY_SHARED_URL.equals(key)) {
+                    updateOverlayState();
+                }
+            };
 
     private final Runnable timerTick = new Runnable() {
         @Override
@@ -121,6 +130,8 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     protected void onServiceConnected() {
         super.onServiceConnected();
         prefs = getSharedPreferences(SwipeSettings.PREFS, MODE_PRIVATE);
+        prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener);
+        preferenceListenerRegistered = true;
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         registerControlReceiver();
         showOverlayIfAllowed();
@@ -148,6 +159,10 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         if (receiverRegistered) {
             unregisterReceiver(controlReceiver);
             receiverRegistered = false;
+        }
+        if (preferenceListenerRegistered) {
+            prefs.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener);
+            preferenceListenerRegistered = false;
         }
         prefs.edit().putBoolean(SwipeSettings.KEY_RUNNING, false).apply();
         return super.onUnbind(intent);
@@ -265,6 +280,15 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayStatusView.setGravity(Gravity.CENTER);
         root.addView(overlayStatusView);
 
+        overlaySharedUrlButton = new Button(this);
+        overlaySharedUrlButton.setAllCaps(false);
+        overlaySharedUrlButton.setMinWidth(0);
+        overlaySharedUrlButton.setMinimumWidth(0);
+        overlaySharedUrlButton.setTextSize(9);
+        overlaySharedUrlButton.setPadding(0, 0, 0, 0);
+        overlaySharedUrlButton.setOnClickListener(v -> openSharedUrl());
+        root.addView(overlaySharedUrlButton, compactUrlButtonParams());
+
         overlayModeButton = new Button(this);
         overlayModeButton.setAllCaps(false);
         overlayModeButton.setMinWidth(0);
@@ -316,6 +340,12 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
 
     private LinearLayout.LayoutParams compactButtonParams() {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(72), dp(42));
+        params.setMargins(0, dp(3), 0, 0);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams compactUrlButtonParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(104), dp(48));
         params.setMargins(0, dp(3), 0, 0);
         return params;
     }
@@ -387,6 +417,19 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayTimerButton.setText(timerButtonText());
         overlayLockButton.setText(prefs.getBoolean(SwipeSettings.KEY_LOCK_ON_TIMER, false) ? "L ON" : "L OFF");
         overlayToggleButton.setText(running ? "停止" : "開始");
+        String sharedUrl = SharedUrlManager.getCachedUrl(prefs);
+        if (overlaySharedUrlButton != null) {
+            if (sharedUrl.isEmpty()) {
+                overlaySharedUrlButton.setVisibility(View.GONE);
+            } else {
+                overlaySharedUrlButton.setText("リンク\n" + SharedUrlManager.displayLabel(sharedUrl));
+                overlaySharedUrlButton.setVisibility(View.VISIBLE);
+            }
+        }
+    }
+
+    private void openSharedUrl() {
+        SharedUrlManager.open(this, SharedUrlManager.getCachedUrl(prefs));
     }
 
     private void toggleMode() {
@@ -564,6 +607,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlayTargetButton = null;
         overlayTimerButton = null;
         overlayLockButton = null;
+        overlaySharedUrlButton = null;
     }
 
     private boolean performSelectedAction(GestureResultCallback callback) {
