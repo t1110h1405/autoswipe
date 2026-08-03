@@ -2,9 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/fireba
 import {
     GoogleAuthProvider,
     getAuth,
-    getRedirectResult,
     onAuthStateChanged,
-    signInWithRedirect,
+    signInWithPopup,
     signOut
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
@@ -18,7 +17,7 @@ import {
 const ADMIN_EMAIL = "t1110h1405@gmail.com";
 const firebaseConfig = {
     apiKey: "AIzaSyD6J-fg2Y31U2eYo4y7fcZdfET1GiHdMIQ",
-    authDomain: "autoswipe-t1110h1405.web.app",
+    authDomain: "autoswipe-t1110h1405.firebaseapp.com",
     databaseURL: "https://autoswipe-t1110h1405-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "autoswipe-t1110h1405",
     storageBucket: "autoswipe-t1110h1405.firebasestorage.app",
@@ -120,14 +119,13 @@ loginButton.addEventListener("click", async () => {
     try {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
-        await signInWithRedirect(auth, provider);
+        await signInWithPopup(auth, provider);
+        setStatus("ログインしました。");
     } catch (error) {
-        setStatus(`ログインできませんでした（${error.code || "unknown"}）。`, true);
+        setStatus(error.code === "auth/popup-closed-by-user"
+            ? "ログインをキャンセルしました。"
+            : `ログインできませんでした（${error.code || "unknown"}）。`, true);
     }
-});
-
-getRedirectResult(auth).catch((error) => {
-    setStatus(`ログインできませんでした（${error.code || "unknown"}）。`, true);
 });
 
 logoutButton.addEventListener("click", async () => {
