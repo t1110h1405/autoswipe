@@ -22,7 +22,7 @@
 
 ## 共有リンク管理
 
-- 管理ページ: https://autoswipe-t1110h1405.web.app
+- 管理ページ: https://autoswipe-t1110h1405.firebaseapp.com
 - `t1110h1405@gmail.com` の Google アカウントだけがリンクを変更できます。
 - 保存できるのは `http://` または `https://` のURLだけです。
 - 通知や自動表示は行いません。各端末でアプリ内のボタンを押して開きます。
