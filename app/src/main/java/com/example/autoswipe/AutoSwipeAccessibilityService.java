@@ -284,7 +284,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
         overlaySharedUrlButton.setAllCaps(false);
         overlaySharedUrlButton.setMinWidth(0);
         overlaySharedUrlButton.setMinimumWidth(0);
-        overlaySharedUrlButton.setTextSize(9);
+        overlaySharedUrlButton.setTextSize(10);
         overlaySharedUrlButton.setPadding(0, 0, 0, 0);
         overlaySharedUrlButton.setOnClickListener(v -> openSharedUrl());
         root.addView(overlaySharedUrlButton, compactUrlButtonParams());
@@ -345,7 +345,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
     }
 
     private LinearLayout.LayoutParams compactUrlButtonParams() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(104), dp(48));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(72), dp(34));
         params.setMargins(0, dp(3), 0, 0);
         return params;
     }
@@ -422,7 +422,7 @@ public class AutoSwipeAccessibilityService extends AccessibilityService {
             if (sharedUrl.isEmpty()) {
                 overlaySharedUrlButton.setVisibility(View.GONE);
             } else {
-                overlaySharedUrlButton.setText("リンク\n" + SharedUrlManager.displayLabel(sharedUrl));
+                overlaySharedUrlButton.setText("リンク");
                 overlaySharedUrlButton.setVisibility(View.VISIBLE);
             }
         }
