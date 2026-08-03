@@ -72,9 +72,6 @@ final class SharedUrlManager {
         }
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url.trim()));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (intent.resolveActivity(context.getPackageManager()) == null) {
-            return false;
-        }
         try {
             context.startActivity(intent);
             return true;
